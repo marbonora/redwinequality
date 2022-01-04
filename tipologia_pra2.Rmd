@@ -1,0 +1,299 @@
+---
+title: "tipologia_pra2"
+author: "Mar Bonora Ortega"
+date: "19/12/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Descripción del dataset
+El dataset elegido es “Red Wine Quality”, disponible en Kaggle. (https://www.kaggle.com/uciml/red-wine-quality-cortez-et-al-2009). Dicho conjunto de datos contiene información respecto a diferentes tipos de vinos, como la densidad, el pH, el azúcar residual, etc. Además, también contiene un valor para la calidad, con lo cual, lo que se pretende con el estudio de este conjunto de datos, es intentar clasificar los diferentes vinos en función de sus características, así como poder predecir la calidad de otros vinos que no forman parte del conjunto en la actualidad, en función de las dichas características.
+
+
+# Integración y selección de los datos de interés
+El primer paso, como en cualquier estudio de datos de este estilo, es el de instalar todos los paquetes y librerías que se irán necesitando a lo largo del desarrollo del mismo.
+```{r}
+#install.packages("readr")
+#install.packages("stringr")
+#install.packages("VIM")
+#install.packages("dplyr")
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("nortest")
+#install.packages("gridExtra")
+#install.packages("PerformanceAnalytics")
+
+library(readr)
+library(stringr)
+library(VIM)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(nortest)
+library(gridExtra)
+library(PerformanceAnalytics)
+```
+
+Comenzamos cargando el conjunto de datos "Red Wine Quality" de Kaggle, página de la que hemos descargado el archivo csv. Mostramos las primeras líneas del dataframe generado para comprobar que se ha cargado correctamente.
+```{r }
+data_wine <- read.csv("./winequality-red.csv",header=T,sep=",")
+attach(data_wine)
+head(data_wine)
+```
+
+# Limpieza de datos
+A continuación, vamos a explorar los datos para poder limpiarlos y dejarlos listos para el análisis. 
+Primero calcularemos las dimensiones de nuestra base de datos y analizaremos los atributos.
+```{r}
+dim(data_wine)
+```
+Disponemos de 1599 registros o vinos (filas) y 12 variables (columnas).
+
+Utilizamos la función str() para explorar las variables. Observamos que todas son numéricas. 
+```{r}
+str(data_wine)
+```
+
+
+La lista de variables que componen el conjunto de datos es la siguiente:
+  - Fixed acidity (num): acidez fija del vino, es decir, ácidos que no se evaporan rápidamente. 
+  - Volatile acidity (num): acidez volátil del vino, que en grandes cantidades puede dar sabor avinagrado
+  - Citric acid (num): ácido cítrico, que en pequeñas cantidades puede añadir "frescura" y sabor al vino
+  - Residual sugar (num): cantidad de azúcar después de la fermentación 
+  - Chlorides (num): cantidad de sal en el vino
+  - Free sulfur dioxide (num): cantidad de forma libre de SO2 en el vino
+  - Total sulfur dioxide (num): cantidad de formas libres y ligadas de SO2 en el vino
+  - Density (num): densidad del vino
+  - pH (num): nivel de pH, cuán ácido o básico es el vino
+  - Sulphates (num): cantidad de sulfatos en el vino
+  - Alcohol (num): porcentaje de alcohol en el vino
+  - Quality (int): puntuación del vino (entre 0 y 10), se considera la variable de salida
+
+
+## Valores nulos 
+Nos interesa saber si hay valores nulos (campos vacíos) y la distribución de valores por variables. La función summary nos mostrará la cantidad de valores perdidos para cada variable. 
+```{r}
+summary(data_wine)
+```
+
+Vemos que no hay valores perdidos, así que comprobaremos si hay valores missing.
+```{r}
+missing <- data_wine[is.na(data_wine),]
+dim(missing)
+```
+
+## Valores extremos
+Observamos que no hay valores missing, por lo que no hay que procesarlos. También queremos comprobar si hay valores extremos o outliers, para lo que mostramos las variables en diagramas de cajas.
+```{r}
+boxplot(data_wine)
+```
+Observamos que ciertas variables sí parecen tener outliers, pero al mostrarlas todas en el mismo plot, perdemos datos. Vamos a mostrarlas por separado para ver claramente cada caso.
+```{r}
+par(mfrow=c(2,2))
+boxplot(data_wine$fixed.acidity, main = "Fixed Acidity")
+boxplot(data_wine$volatile.acidity, main = "Volatile Acidity")
+boxplot(data_wine$citric.acid, main = "Citric Acid")
+boxplot(data_wine$residual.sugar, main = "Residual Sugar")
+boxplot(data_wine$chlorides, main = "Chlorides")
+boxplot(data_wine$free.sulfur.dioxide, main = "Free Sulfur Dioxide")
+boxplot(data_wine$total.sulfur.dioxide, main = "Total Sulfur Dioxide")
+boxplot(data_wine$density, main = "Density")
+boxplot(data_wine$pH, main = "pH")
+boxplot(data_wine$sulphates, main = "Sulphates")
+boxplot(data_wine$alcohol, main = "Alcohol")
+boxplot(data_wine$quality, main = "Quality")
+
+```
+Aunque casi todas las variables tienen valores que se poderían considerar atípicos, pues están muy alejados de la media y en el gráfico de cajas y bigotes se ven representados por encima o por debajo de los bigotes, no hace falta deshecharlos todos, ya que en la mayoría de casos no son muchos ni los valores son demasiado grandes o pequeños.
+
+Aún así, sí que vamos a desecharlos de algunas variables: total sulfur dioxide, residential sugar, chlorides y sulphates.
+```{r}
+# Sulfur Dioxide
+outliers_total_sulfur_dioxide <- boxplot(data_wine$total.sulfur.dioxide, main = "Total Sulfur Dioxide")$out
+outliers_total_sulfur_dioxide
+data_wine <- data_wine[-which(data_wine$total.sulfur.dioxide %in% outliers_total_sulfur_dioxide),]
+boxplot(data_wine$total.sulfur.dioxide, main = "Total Sulfur Dioxide without outliers")
+
+# Residential Sugar
+outliers_residential_sugar <- boxplot(data_wine$residual.sugar, main = "Residential Sugar")$out
+outliers_residential_sugar
+data_wine <- data_wine[-which(data_wine$residual.sugar %in% outliers_residential_sugar),]
+boxplot(data_wine$residual.sugar, main = "Residential Sugar without outliers")
+
+# Chlorides
+outliers_chlorides <- boxplot(data_wine$chlorides, main = "Chlorides")$out
+outliers_chlorides
+data_wine <- data_wine[-which(data_wine$chlorides %in% outliers_chlorides),]
+boxplot(data_wine$chlorides, main="Chlorides without outliers")
+
+# Sulphates
+outliers_sulphates <- boxplot(data_wine$sulphates, main = "Sulphates")$out
+outliers_sulphates
+data_wine <- data_wine[-which(data_wine$sulphates %in% outliers_sulphates),]
+boxplot(data_wine$residual.sugar, main = "Sulphates without outliers")
+```
+Una vez hechas estas modificaciones, podemos decir que tenemos un dataframe de 12 variables numéricas sin valores nulo, sin valores missing y sin valores extremos de importancia.
+
+# Análisis de los datos
+Una vez hemos explorado los datos para poder limpiarlos, vamos a pasar al análisis de los mismos. 
+
+## Selección de los datos que se quieren analizar
+Vamos a utilizar todas las variables del conjunto de datos que tenemos, ya que tenemos, por un lado 11 variables que nos proporcionan información de las características del vino en cuestión, y otra variable que sería la "target" (variable quality) que es la puntuación final del vino. 
+
+## Comprobación de la normalidad y homogeneidad de la varianza
+En primer lugar, nos interesa comprobar si las variables son candidatas a la normalización. Para ello, utilizaremos las gráficas de quantile-quantile e histogramas.
+```{r}
+par(mfrow = c(2,2))
+for(i in 1:ncol(data_wine)) {
+  if (is.numeric(data_wine[,i])){
+    qqnorm(data_wine[,i],main = paste("Normal Q-Q Plot for ",colnames(data_wine)[i]))
+    qqline(data_wine[,i],col="red")
+    hist(data_wine[,i], 
+      main=paste("Histogram for ", colnames(data_wine)[i]), 
+      xlab=colnames(data_wine)[i], freq = FALSE)
+  }
+}
+```
+
+
+Las variables sí pueden normalizarse en caso de ser necesario, como podemos observar en las gráficas QQ. Aplicamos el test de Shapiro Wilk en todas las variables, ya que todas son numérica, para comprobar si están normalizadas. 
+
+```{r}
+shapiro.test(data_wine$fixed.acidity)
+shapiro.test(data_wine$volatile.acidity)
+shapiro.test(data_wine$citric.acid)
+shapiro.test(data_wine$residual.sugar)
+shapiro.test(data_wine$chlorides)
+shapiro.test(data_wine$free.sulfur.dioxide)
+shapiro.test(data_wine$total.sulfur.dioxide)
+shapiro.test(data_wine$density)
+shapiro.test(data_wine$pH)
+shapiro.test(data_wine$sulphates)
+shapiro.test(data_wine$alcohol)
+```
+Nos fijamos en que para todas las variables, el valor de p-value es inferior a 0.05. Esto nos confirma que ninguna de las variables está normalizada; rechazamos la hipótesis nula del Shapiro Wilk normality test.
+
+Este hecho no supone nigún problema. Según el Teorema del Límite Central, cuando tenemos un conjunto de datos "lo suficientemente grande" como en nuestro caso, podemos aproximar como una distribución normal de media 0 y distribución estándar 1. 
+
+## Pruebas estadísticas para comparar los grupos de datos (pruebas de contraste de hipótesis, correlaciones, regresiones, etc)
+Vamos a estudiar la correlación entre variables para obtener las que más relación tengan con nuestra target. Nos interesa esta información para desarrollar un modelo de regresión.
+```{r}
+pairs(data_wine)
+
+chart.Correlation(data_wine, histogram = TRUE, method = "pearson")
+```
+
+Nos interesa detectar las variables que tengan una relación al menos moderadamente fuerte con la variable target *quality*, ya sea positiva o negativa. De la segunda tabla podemos ver lo siguiente:
+  - Con Alcohol el coeficiente de correlación es 0.48.
+  - Con Sulphates el coeficiente de correlación es 0.43.
+  - Con Volatile.acidity el coeficiente de correlación es -0.38.
+  
+Vamos a probar a generar un modelo de regresión lineal que pretenda explicar la puntuación de calidad del vino, utilizando estas variables. Comenzaremos con un modelo de regresión lineal simple que utilice la variable **alcohol** como explicativa.
+```{r}
+regresion_simple_wine <- lm(quality ~ alcohol, data = data_wine)
+summary(regresion_simple_wine)
+```
+
+A continuación representamos la nube de puntos y la recta de mínimos cuadrados (en rojo).
+```{r}
+plot(data_wine$alcohol, data_wine$quality, xlab='Alcohol', ylab='Quality')
+abline(regresion_simple_wine, col="red")
+```
+Queremos evaluar la bondad del ajuste, que es el coeficiente de determinación de R2. Nos indica el grado de ajuste de la recta a los valores de muestra, y se define como la proporción de la varianza explicada por la recta de regresión.
+
+Este valor lo podemos ver del modelo obtenido, en concreto es el valor Multiple R-squared: 0.2315. El valor se acerca mucho a 0, lo cual indica que el modelo no explica ninguna porción de variabilidad de los datos de respuesta en torno a su media. 
+
+Probaremos a construir un modelo de regresión lineal múltiple para explicar la calidad del vino. Vamos a ir añadiendo variables explicativas una a una para comprobar que efectivamente el modelo va mejorando según lo esperado, y que no estamos utilizando variables redundantes que no aportan valor. 
+
+En primer lugar, utilizaremos como variables explicativas **alcohol**, con un coeficiente de correlación con **quality** de 0.48, y **sulphates** de 0.43.
+```{r}
+regresion_multiple_wine <- lm(quality ~ alcohol + sulphates, data = data_wine)
+summary(regresion_multiple_wine)
+```
+
+Una vez generado el modelo, podemos ver que la bondad de ajuste ha mejorado respecto al modelo lineal. Mientras antes tenía un valor de 0.2315, ahora su valor ha subido a 0.333 Aún así, sigue siendo un valor bajo y por lo tanto el modelo no es explicativo. 
+
+Vamos a añadirle al modelo la variable explicativa **volatile.acidity** que, como hemos visto, tiene un coeficiente de correlación con **quality** de -0.38.
+```{r}
+regresion_multiple_wine2 <- lm(quality ~ alcohol + sulphates + volatile.acidity, data = data_wine)
+summary(regresion_multiple_wine2)
+```
+
+Observamos que la bondad de ajuste ha mejorado respecto al modelo lineal múltiple anterior. Mientras antes tenía un valor de 0.333, ahora su valor ha subido a 0.3737 Aún así, sigue siendo un valor bajo y por lo tanto el modelo no es explicativo.
+
+En la tabla de correlaciones también tenemos dos variables que tienen un coeficiente de correlación con quality de 0.22. Dichas variable son **citric.acid** y **density**. Vamos a probar a añadirlas al modelo.
+
+```{r}
+regresion_multiple_wine3 <- lm(quality ~ alcohol + sulphates + volatile.acidity + citric.acid, data = data_wine)
+summary(regresion_multiple_wine3)
+```
+
+```{r}
+regresion_multiple_wine4 <- lm(quality ~ alcohol + sulphates + volatile.acidity + density, data = data_wine)
+summary(regresion_multiple_wine4)
+```
+Observamos que la bondad de ajuste NO ha mejorado respecto al modelo lineal múltiple anterior. Si añadimos la variable explicativa **citric.acid** su valor no aumenta en absoluto. Si añadimos **density**, su valor aumenta de 0.3737 a 0.3742, lo cual NO es significativo. 
+
+La capacidad explicativa del modelo elegido, que es el de tres variables explicativas, no es satisfactoria, ya que R2 tiene un valor de 0.3737.
+
+Aun así, podemos hacer un ejemplo de cómo se llevaría a cabo la predicción de un nuevo dato.
+
+```{r}
+predict(regresion_multiple_wine2, newdata = data.frame(alcohol=9.4, sulphates=0.56, volatile.acidity=0.70))
+```
+
+La puntuación esperada para la calidad es de 5, así que ha acertado, aunque no nos fiamos del modelo para utilizarlo para otras predicciones. 
+
+# Representación de los resultados a partir de tablas y gráficas
+A lo largo del estudio hemos ido mostrando tablas de datos y gráficas, para las relaciones entre variables, por ejemplo. De todas formas, vamos a concluir con algunos gráficos que pueden mostrarnos más información sobre el conjunto de datos y el estudio que hemos realizado. 
+
+Por un lado, vamos a volver a visualizar la frecuencia de puntuaciones que nos ofrece la variable target, que es **quality**. 
+```{r}
+hist(data_wine$quality)
+```
+Vamos a ver de forma visual la forma en que están distribuidos los tipos de vino según las tres variables explicativas más fuertes. Para ello las discretizaremos.
+
+Alcohol. 
+```{r}
+summary(data_wine$alcohol)
+data_wine["alcohol_segment"] <- cut(data_wine$alcohol, breaks = c(8,9,10,11,12,13,14), labels = c("<9", "10", "11", "12","13","14"))
+filas=dim(data_wine)[1]
+ggplot(data=data_wine[1:filas,],aes(x=quality,fill=alcohol_segment))+geom_bar()+ggtitle("Relación entre las variables quality y alcohol")
+```
+
+Sulphates.
+```{r}
+data_wine["sulphates_segment"] <- cut(data_wine$sulphates, breaks = c(0.3,0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), labels = c("<0.4", "0.5", "0.6","0.7","0.8", "0.9", "1"))
+filas=dim(data_wine)[1]
+ggplot(data=data_wine[1:filas,],aes(x=quality,fill=sulphates_segment))+geom_bar()+ggtitle("Relación entre las variables quality y sulphates")
+```
+
+Volatile.acidity.
+```{r}
+data_wine["volatile.acidity_segment"] <- cut(data_wine$volatile.acidity, breaks = c(0.1,0.3,0.6,0.9,1.2,1.4), labels = c("<0.3", "0.6", "0.9", "1.2","1.4"))
+filas=dim(data_wine)[1]
+ggplot(data=data_wine[1:filas,],aes(x=quality,fill=volatile.acidity_segment))+geom_bar()+ggtitle("Relación entre las variables quality y volatile.acidity")
+```
+
+# Conclusiones
+
+En resumen, se ha realizado un estudio lo suficientementemente exhaustivo sobre los datos que tenemos como para poder hacernos una idea profunda de los mismos. Hemos intentado construir un modelo de regresión lineal múltiple utilizando como variables explicativas, las que están más fuertemente correlacionadas con la variable que nos informa sobre la calidad. Aún así, el modelo construido no es suficientemente explicativo como para poder utilizarlo para realizar predicciones sobre nuevos datos reales. 
+
+Utilizando esta información que ahora tenemos, aunque podemos ver qué variables influyen más en la puntuación del vino, seguimos sin poder utilizarlas realmente para predecir. Por ello, podemos intuir que la calidad del vino tiene un componente subjetivo de la persona que lo califica, que no puede ser reflejado en los datos que se nos proporcionan sobre dicho vino. 
+
+# Fichero de salida
+Vamos a pasar el dataframe obtenido a un fichero csv de salida. 
+```{r}
+write.csv(data_wine,"./datawine.csv", row.names = FALSE)
+```
+
+
+# Integrantes del grupo
+Por motivos personales, he decidido que sería mejor desarrollar la práctica por mi cuenta en lugar de formar grupo con otro compañero o compañera. 
+
+**Contribuciones: Firma**
+Investigación previa: Mar Bonora Ortega
+Redacción de respuestas: Mar Bonora Ortega
+Desarrollo código: Mar Bonora Ortega
+
